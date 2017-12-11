@@ -58,6 +58,7 @@ static int              out_buf;
 static int              force_format;
 static int              frame_count = 200;
 static int              frame_number = 0;
+static Mat img(480, 1280, CV_8U);
 
 static void errno_exit(const char *s)
 {
@@ -138,7 +139,15 @@ static int read_frame(void)
 
                 assert(buf.index < n_buffers);
 
+		// DISPLAY IMAGE
+		
+		img.data = (uchar*)buffers[buf.index].start;
+		imshow("Window", img);
+		//waitKey(1);
+		
                 process_image(buffers[buf.index].start, buf.bytesused);
+
+		waitKey(1);
 
                 if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
                         errno_exit("VIDIOC_QBUF");
@@ -499,7 +508,7 @@ static void init_device(void)
 
         fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         if (force_format) {
-	fprintf(stderr, "Set H264\r\n");
+	fprintf(stderr, "Set RAW 8-bit grayscale.\r\n");
                 fmt.fmt.pix.width       = 1280; //replace
                 fmt.fmt.pix.height      = 480; //replace
                 fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_GREY; //replace
@@ -669,10 +678,6 @@ int main(int argc, char **argv)
 		std::cin.get();
 		return -1;
 	}
-
-	imshow("Window", image);
-	waitKey(0);
-	destroyWindow("Window");
 
         open_device();
         init_device();
