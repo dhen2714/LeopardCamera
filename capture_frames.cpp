@@ -5,6 +5,11 @@
  *
  *      This program is provided with the V4L2 API
  * see http://linuxtv.org/docs.php for more information
+ *
+ * Modified for LI-OV580 OV7251 stereo camera
+ * by David 18/12/17.
+ * 
+ * To be compiled as C++ not C! Requires OpenCV.
  */
 
 #include <stdio.h>
@@ -26,6 +31,8 @@
 #include <linux/videodev2.h>
 
 #include <iostream>
+#include <chrono>
+
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
@@ -56,6 +63,7 @@ static buffer          *buffers;
 static unsigned int     n_buffers;
 static int              out_buf;
 static int              force_format;
+static int		save_frames; // if 0, don't write frames to disk.
 static int              frame_count = 200;
 static int              frame_number = 0;
 static Mat img(480, 1280, CV_8U);
@@ -145,7 +153,8 @@ static int read_frame(void)
 		imshow("Window", img);
 		//waitKey(1);
 		
-                process_image(buffers[buf.index].start, buf.bytesused);
+		if (save_frames)
+                	process_image(buffers[buf.index].start, buf.bytesused);
 
 		waitKey(1);
 
@@ -198,6 +207,7 @@ static void mainloop(void)
         count = frame_count;
 
         while (count-- > 0) {
+		auto start = std::chrono::system_clock::now();
                 for (;;) {
                         fd_set fds;
                         struct timeval tv;
@@ -227,6 +237,9 @@ static void mainloop(void)
                                 break;
                         /* EAGAIN - continue select loop. */
                 }
+		auto end = std::chrono::system_clock::now();
+		auto elapsed = end - start;
+		std::cout << elapsed.count() << std::endl;
         }
 }
 
@@ -592,12 +605,13 @@ static void usage(FILE *fp, int argc, char **argv)
                  "-u | --userp         Use application allocated buffers\n"
                  "-o | --output        Outputs stream to stdout\n"
                  "-f | --format        Force format to 640x480 YUYV\n"
+		 "-s | --save          Save images to disk\n"
                  "-c | --count         Number of frames to grab [%i]\n"
                  "",
                  argv[0], dev_name, frame_count);
 }
 
-static const char short_options[] = "d:hmruofc:";
+static const char short_options[] = "d:hmruofsc:";
 
 static const struct option
 long_options[] = {
@@ -608,6 +622,7 @@ long_options[] = {
         { "userp",  no_argument,       NULL, 'u' },
         { "output", no_argument,       NULL, 'o' },
         { "format", no_argument,       NULL, 'f' },
+	{ "save",   no_argument,       NULL, 's' },
         { "count",  required_argument, NULL, 'c' },
         { 0, 0, 0, 0 }
 };
@@ -657,6 +672,10 @@ int main(int argc, char **argv)
                 case 'f':
                         force_format++;
                         break;
+		
+		case 's':
+			save_frames++;
+			break;
 
                 case 'c':
                         errno = 0;
@@ -670,14 +689,6 @@ int main(int argc, char **argv)
                         exit(EXIT_FAILURE);
                 }
         }
-
-	Mat image = imread("/home/david/Pictures/t3_7iu0w4.jpeg");
-	if (image.empty())
-	{
-		std::cout << "Could not open or find the image" << std::endl;
-		std::cin.get();
-		return -1;
-	}
 
         open_device();
         init_device();
